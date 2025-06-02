@@ -1,105 +1,145 @@
 <!DOCTYPE html><html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RPG game </title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RPG Canvas Game</title>
   <style>
-    * {
-      box-sizing: border-box;
-      font-family: monospace;
-    }
-    body {
+    body, html {
       margin: 0;
       padding: 0;
-      background: linear-gradient(145deg, #1a1a1a, #2e2e2e);
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      min-height: 100vh;
+      overflow: hidden;
+      background: #000;
     }
-    h1 {
-      margin-top: 20px;
+    canvas {
+      display: block;
+      background: linear-gradient(#444, #111);
     }
-    .hud {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 15px;
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: monospace;
+      font-size: 14px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
       border-radius: 10px;
-      margin: 20px 0;
-      width: 90%;
-      max-width: 800px;
-    }
-    .section {
-      flex: 1 1 200px;
-      padding: 10px;
-      background: #222;
-      border-radius: 8px;
-    }
-    button, select, input[type="number"] {
-      margin: 5px 0;
-      padding: 5px;
-      width: 100%;
-    }
-    .log {
-      width: 90%;
-      max-width: 800px;
-      background: #111;
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      overflow-y: auto;
-      max-height: 200px;
     }
   </style>
 </head>
 <body>
-  <h1>RPG Completo</h1>
-  <div class="hud">
-    <div class="section">
-      <h3>Status</h3>
-      <div id="status"></div>
-      <input type="number" id="ptsInput" placeholder="Distribuir Pontos">
-      <button onclick="distribuirPontos('vida')">+Vida</button>
-      <button onclick="distribuirPontos('mana')">+Mana</button>
-      <button onclick="distribuirPontos('defesa')">+Defesa</button>
-      <button onclick="distribuirPontos('dano')">+Dano</button>
-    </div>
-    <div class="section">
-      <h3>Combate</h3>
-      <button onclick="atacar()">Atacar</button>
-      <button onclick="usarPocao('vida')">Usar Poção de Vida</button>
-      <button onclick="usarPocao('mana')">Usar Poção de Mana</button>
-      <button onclick="usarBomba()">Usar Bomba</button>
-    </div>
-    <div class="section">
-      <h3>Loja</h3>
-      <select id="itemSelect">
-        <option value="espada">Espada (+Dano)</option>
-        <option value="armadura">Armadura (+Defesa)</option>
-        <option value="anel">Anel Mágico (+Mana)</option>
-      </select>
-      <button onclick="comprarItem()">Comprar</button>
-    </div>
-    <div class="section">
-      <h3>Missão</h3>
-      <div id="missao"></div>
-      <button onclick="aceitarMissao()">Aceitar Missão</button>
-    </div>
-    <div class="section">
-      <h3>Jogo</h3>
-      <button onclick="salvarJogo()">Salvar</button>
-      <button onclick="carregarJogo()">Carregar</button>
-    </div>
-  </div>
-  <div class="log" id="log"></div>
-  <script>
-    // Lógica completa do jogo aqui (personagem, combate, loja, missões, etc.)
-    // Mantenha o código JS já existente no final do seu HTML original aqui.
-  </script>
-</body>
+  <canvas id="game"></canvas>
+  <div id="hud">HP: <span id="hp">100</span></div>  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Controles
+    let keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key] = true);
+    window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+    // Mobile
+    let touch = { left: false, right: false, up: false, attack: false };
+
+    // Jogador
+    const player = {
+      x: 100,
+      y: 100,
+      w: 40,
+      h: 60,
+      vx: 0,
+      vy: 0,
+      speed: 3,
+      jumping: false,
+      onGround: false,
+      color: 'lime',
+      hp: 100,
+      attackCooldown: 0
+    };
+
+    // Inimigos
+    const enemies = [
+      { x: 300, y: 100, w: 40, h: 60, color: 'red', hp: 50 }
+    ];
+
+    // Gravidade
+    const gravity = 0.5;
+
+    function update() {
+      player.vx = 0;
+      if (keys['ArrowLeft'] || touch.left) player.vx = -player.speed;
+      if (keys['ArrowRight'] || touch.right) player.vx = player.speed;
+      if ((keys['ArrowUp'] || touch.up) && player.onGround) {
+        player.vy = -10;
+        player.onGround = false;
+      }
+
+      player.vy += gravity;
+      player.x += player.vx;
+      player.y += player.vy;
+
+      // Chão
+      if (player.y + player.h > canvas.height) {
+        player.y = canvas.height - player.h;
+        player.vy = 0;
+        player.onGround = true;
+      }
+
+      // Ataque
+      if ((keys[' '] || touch.attack) && player.attackCooldown <= 0) {
+        attack();
+        player.attackCooldown = 30;
+      }
+
+      if (player.attackCooldown > 0) player.attackCooldown--;
+
+      document.getElementById('hp').textContent = player.hp;
+    }
+
+    function attack() {
+      const swordRange = 50;
+      enemies.forEach(enemy => {
+        if (Math.abs(player.x - enemy.x) < swordRange && Math.abs(player.y - enemy.y) < player.h) {
+          enemy.hp -= 10;
+        }
+      });
+    }
+
+    function drawCharacter(x, y, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Fundo
+      ctx.fillStyle = '#222';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#333';
+      for (let i = 0; i < canvas.width; i += 50) {
+        ctx.fillRect(i, canvas.height - 20, 40, 20);
+      }
+
+      // Jogador
+      drawCharacter(player.x, player.y, player.w, player.h, player.color);
+
+      // Inimigos
+      enemies.forEach(enemy => {
+        if (enemy.hp > 0) drawCharacter(enemy.x, enemy.y, enemy.w, enemy.h, enemy.color);
+      });
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script></body>
 </html>
